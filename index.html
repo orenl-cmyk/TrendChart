@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+  <meta charset="UTF-8">
+  <title>ניקוד אישי מול ממוצע חודשי</title>
+
+  <!-- Highcharts -->
+  <script src="https://code.highcharts.com/highcharts.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #fff;
+    }
+    #container {
+      width: 100%;
+      height: 520px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="container">טוען גרף…</div>
+
+<script>
+/*
+  ====== מצב בדיקה ======
+  כרגע הדאטה סטטי כדי לוודא שהגרף מצויר כמו שצריך.
+  בשלב הבא נחליף ל-fetch(API_URL)
+*/
+const data = [
+  { month: "2025-08", personal: 72, avg: 68 },
+  { month: "2025-09", personal: 69, avg: 63 },
+  { month: "2025-10", personal: 62, avg: 61 },
+  { month: "2025-11", personal: 75, avg: 59 },
+  { month: "2025-12", personal: 58, avg: 57 },
+  { month: "2026-01", personal: 61, avg: 58 },
+  { month: "2026-02", personal: 63, avg: 60 },
+  { month: "2026-03", personal: 57, avg: 55 },
+  { month: "2026-04", personal: 64, avg: 62 },
+  { month: "2026-05", personal: 66, avg: 61 },
+  { month: "2026-06", personal: 68, avg: 63 },
+  { month: "2026-07", personal: 70, avg: 64 }
+];
+
+// הכנת נתונים לגרף
+const months   = data.map(d => d.month);
+const personal = data.map(d => d.personal);
+const avg      = data.map(d => d.avg);
+
+// ציור הגרף
+Highcharts.chart('container', {
+  chart: {
+    zoomType: 'x'
+  },
+  title: {
+    text: 'ניקוד אישי מול ממוצע חודשי'
+  },
+  xAxis: {
+    categories: months,
+    title: { text: 'חודש' }
+  },
+  yAxis: {
+    title: { text: 'ניקוד' }
+  },
+  tooltip: {
+    shared: true
+  },
+  series: [
+    {
+      type: 'column',
+      name: 'ניקוד אישי',
+      data: personal
+    },
+    {
+      type: 'line',
+      name: 'ממוצע חודשי',
+      data: avg,
+      marker: { enabled: true }
+    }
+  ],
+  credits: { enabled: false }
+});
+</script>
+
+</body>
+</html>
