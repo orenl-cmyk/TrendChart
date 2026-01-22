@@ -1,161 +1,160 @@
 <!DOCTYPE html>
-<html lang="he">
+<html lang="he" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <title>Trend Demo</title>
-<script>
-/* =========================
-   0. קריאת פרמטר id מה-URL
-   ========================= */
-const params = new URLSearchParams(window.location.search);
-const personId = params.get("id");
+  <meta charset="UTF-8" />
+  <title>ניקוד אישי מול ממוצע חודשי</title>
 
-if (!personId) {
-  document.body.innerHTML = `
-    <h2 style="color:#b00020">❌ חסר פרמטר id ב-URL</h2>
-    <p>יש לקרוא לדף כך:</p>
-    <code>?id=XXXXXXXX</code>
-  `;
-  throw new Error("Missing id parameter");
-}
-
-// לדמו – רק נציג אותו
-console.log("Trend for ID:", personId);
-</script>
-
-  <script src="https://code.highcharts.com/highcharts.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     body {
-      font-family: Arial, sans-serif;
-      direction: rtl;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #ffffff;
       margin: 0;
       padding: 20px;
-      background: #fafafa;
     }
-    #container {
-      width: 100%;
-      height: 540px;
+
+    h1 {
+      text-align: right;
+      margin-bottom: 20px;
+    }
+
+    .chart-wrapper {
+      max-width: 1200px;
+      margin: auto;
     }
   </style>
 </head>
 <body>
 
-<h2>ניקוד אישי מול ממוצע חודשי – דמו צבעים</h2>
-<div id="container"></div>
+<h1>ניקוד אישי מול ממוצע חודשי – דמו צבעים</h1>
+
+<div class="chart-wrapper">
+  <canvas id="trendChart"></canvas>
+</div>
 
 <script>
 /* =========================
-   1. נתונים סטטיים (דמו)
+   DATA (סטטי מה-JSON)
    ========================= */
+
 const data = [
-  { month: "01/2026", personal: 85, avg: 75 },
-  { month: "02/2026", personal: 73, avg: 68 },
-  { month: "03/2026", personal: 58, avg: 61 },
-  { month: "04/2026", personal: 62, avg: 58 },
-  { month: "05/2026", personal: 61, avg: 59 },
-  { month: "06/2026", personal: 61, avg: 63 },
-  { month: "07/2026", personal: 61, avg: 57 },
-  { month: "08/2026", personal: 63, avg: 57 },
-  { month: "09/2026", personal: 72, avg: 63 },
-  { month: "10/2026", personal: 72, avg: 59 },
-  { month: "11/2026", personal: 69, avg: 69 },
-  { month: "12/2026", personal: 57, avg: 56 }
+  { month: "01/2026", average: 75, personal: 85 },
+  { month: "02/2026", average: 68, personal: 73 },
+  { month: "03/2026", average: 61, personal: 58 },
+  { month: "04/2026", average: 58, personal: 62 },
+  { month: "05/2026", average: 59, personal: 61 },
+  { month: "06/2026", average: 63, personal: 61 },
+  { month: "07/2026", average: 57, personal: 61 },
+  { month: "08/2026", average: 57, personal: 63 },
+  { month: "09/2026", average: 63, personal: 72 },
+  { month: "10/2026", average: 59, personal: 72 },
+  { month: "11/2026", average: 69, personal: 69 },
+  { month: "12/2026", average: 56, personal: 57 }
 ];
 
 /* =========================
-   2. סקאלת צבעים מותאמת
+   COLOR SCALE HELPERS
    ========================= */
+
 function lerp(a, b, t) {
   return Math.round(a + (b - a) * t);
 }
 
 function colorLerp(c1, c2, t) {
-  return `rgb(
-    ${lerp(c1[0], c2[0], t)},
-    ${lerp(c1[1], c2[1], t)},
-    ${lerp(c1[2], c2[2], t)}
-  )`;
+  return `rgb(${lerp(c1[0], c2[0], t)},
+              ${lerp(c1[1], c2[1], t)},
+              ${lerp(c1[2], c2[2], t)})`;
 }
 
-// צבעים בסיסיים
-const COLD_MIN = [20, 30, 120];    // כחול כהה
-const COLD_MAX = [140, 60, 180];   // סגול
-const HOT_MIN  = [170, 40, 120];   // אדום-סגול
-const HOT_MAX  = [255, 80, 40];    // כתום-אדום
+const COLOR_STOPS = [
+  { t: 0.00, c: [25, 30, 120] },   // כחול כהה
+  { t: 0.25, c: [120, 60, 180] },  // סגול
+  { t: 0.50, c: [200, 60, 90] },   // אדום
+  { t: 0.75, c: [255, 120, 40] },  // כתום
+  { t: 1.00, c: [90, 170, 90] }    // ירוק
+];
 
-function getColor(personal, avg) {
-  const diff = personal - avg;
-  const maxDiff = 20; // טווח נורמליזציה
-  const t = Math.min(Math.abs(diff) / maxDiff, 1);
+function getSmartColor(value, min, max) {
+  if (max === min) return "rgb(120,120,200)";
+  const t = (value - min) / (max - min);
 
-  if (diff < 0) {
-    // מתחת לממוצע: כחול כהה → סגול
-    return colorLerp(COLD_MIN, COLD_MAX, t);
-  } else if (diff > 0) {
-    // מעל הממוצע: אדום-סגול → כתום-אדום
-    return colorLerp(HOT_MIN, HOT_MAX, t);
-  } else {
-    return "#999999";
+  for (let i = 0; i < COLOR_STOPS.length - 1; i++) {
+    const a = COLOR_STOPS[i];
+    const b = COLOR_STOPS[i + 1];
+    if (t >= a.t && t <= b.t) {
+      const localT = (t - a.t) / (b.t - a.t);
+      return colorLerp(a.c, b.c, localT);
+    }
   }
+  return "rgb(0,0,0)";
 }
 
 /* =========================
-   3. הכנת סדרות
+   PREPARE SERIES
    ========================= */
-const categories = data.map(d => d.month);
 
-const personalSeries = data.map(d => ({
-  y: d.personal,
-  color: getColor(d.personal, d.avg)
-}));
+const labels = data.map(d => d.month);
+const averages = data.map(d => d.average);
+const personals = data.map(d => d.personal);
 
-const avgSeries = data.map(d => d.avg);
+const minVal = Math.min(...personals);
+const maxVal = Math.max(...personals);
+
+const personalColors = personals.map(v =>
+  getSmartColor(v, minVal, maxVal)
+);
 
 /* =========================
-   4. ציור הגרף
+   CHART
    ========================= */
-Highcharts.chart('container', {
-  title: {
-    text: 'ניקוד אישי מול ממוצע חודשי'
+
+new Chart(document.getElementById("trendChart"), {
+  type: "bar",
+  data: {
+    labels,
+    datasets: [
+      {
+        type: "bar",
+        label: "ניקוד אישי",
+        data: personals,
+        backgroundColor: personalColors,
+        borderRadius: 6
+      },
+      {
+        type: "line",
+        label: "ממוצע חודשי",
+        data: averages,
+        borderColor: "#333",
+        backgroundColor: "#333",
+        tension: 0.3,
+        pointRadius: 4,
+        pointHoverRadius: 5
+      }
+    ]
   },
-  xAxis: {
-    categories: categories,
-    title: { text: 'חודש' }
-  },
-  yAxis: {
-    title: { text: 'ניקוד' }
-  },
-  tooltip: {
-    shared: true,
-    formatter: function () {
-      const p = this.points[0].y;
-      const a = this.points[1].y;
-      const diff = p - a;
-      const sign = diff > 0 ? "+" : "";
-      return `
-        <b>${this.x}</b><br/>
-        אישי: <b>${p}</b><br/>
-        ממוצע: <b>${a}</b><br/>
-        פער: <b>${sign}${diff}</b>
-      `;
-    }
-  },
-  series: [
-    {
-      type: 'column',
-      name: 'ניקוד אישי',
-      data: personalSeries
+  options: {
+    responsive: true,
+    plugins: {
+      legend: {
+        position: "top"
+      },
+      tooltip: {
+        callbacks: {
+          label: ctx => `${ctx.dataset.label}: ${ctx.raw}`
+        }
+      }
     },
-    {
-      type: 'line',
-      name: 'ממוצע חודשי',
-      data: avgSeries,
-      color: '#444',
-      marker: { enabled: true }
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: "ניקוד"
+        }
+      }
     }
-  ],
-  credits: { enabled: false }
+  }
 });
 </script>
 
