@@ -3,6 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <title>Trend Demo</title>
+<script>
+/* =========================
+   0. קריאת פרמטר id מה-URL
+   ========================= */
+const params = new URLSearchParams(window.location.search);
+const personId = params.get("id");
+
+if (!personId) {
+  document.body.innerHTML = `
+    <h2 style="color:#b00020">❌ חסר פרמטר id ב-URL</h2>
+    <p>יש לקרוא לדף כך:</p>
+    <code>?id=XXXXXXXX</code>
+  `;
+  throw new Error("Missing id parameter");
+}
+
+// לדמו – רק נציג אותו
+console.log("Trend for ID:", personId);
+</script>
 
   <script src="https://code.highcharts.com/highcharts.js"></script>
 
