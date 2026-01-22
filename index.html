@@ -11,7 +11,6 @@
     body {
       margin: 0;
       font-family: Arial, sans-serif;
-      background: #fff;
     }
     #container {
       width: 100%;
@@ -21,66 +20,133 @@
 </head>
 <body>
 
-<div id="container">טוען גרף…</div>
+<div id="container">טוען נתונים…</div>
 
 <script>
-/*
-  ====== מצב בדיקה ======
-  כרגע הדאטה סטטי כדי לוודא שהגרף מצויר כמו שצריך.
-  בשלב הבא נחליף ל-fetch(API_URL)
-*/
-const data = [
-  { month: "2025-08", personal: 72, avg: 68 },
-  { month: "2025-09", personal: 69, avg: 63 },
-  { month: "2025-10", personal: 62, avg: 61 },
-  { month: "2025-11", personal: 75, avg: 59 },
-  { month: "2025-12", personal: 58, avg: 57 },
-  { month: "2026-01", personal: 61, avg: 58 },
-  { month: "2026-02", personal: 63, avg: 60 },
-  { month: "2026-03", personal: 57, avg: 55 },
-  { month: "2026-04", personal: 64, avg: 62 },
-  { month: "2026-05", personal: 66, avg: 61 },
-  { month: "2026-06", personal: 68, avg: 63 },
-  { month: "2026-07", personal: 70, avg: 64 }
-];
+/* =========================
+   1. פרמטר מה-URL
+   ========================= */
+const params = new URLSearchParams(window.location.search);
+const promoId = params.get("id");
 
-// הכנת נתונים לגרף
-const months   = data.map(d => d.month);
-const personal = data.map(d => d.personal);
-const avg      = data.map(d => d.avg);
+if (!promoId) {
+  document.getElementById("container").innerHTML =
+    "<span style='color:red'>חסר פרמטר id ב-URL</span>";
+  throw new Error("Missing id param");
+}
 
-// ציור הגרף
-Highcharts.chart('container', {
-  chart: {
-    zoomType: 'x'
+/* =========================
+   2. הגדרות API
+   ========================= */
+const API_URL = "https://shchori.origami.ms/entities/api/instance_data/format/json";
+
+const REQUEST_BODY = {
+  username: "orenl@pisgacyber.co.il",
+  api_secret: "OGMI-NJK3MJFkNTUxZGR-HZTAtMJMXMzcXNZ-YzNZC2ODkXMDY5N-zIxZDU1MWRKYJQ3-LTM4NDk4MzCW",
+  entity_data_name: "e_171",
+  specific: 1,
+  filter: [
+    ["fld_3096", "=", promoId]
+  ]
+};
+
+/* =========================
+   3. חישוב טווח תאריכים
+   ========================= */
+const now = new Date();
+const startDate = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+
+/* =========================
+   4. קריאה ל-Origami
+   ========================= */
+fetch(API_URL, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json"
   },
-  title: {
-    text: 'ניקוד אישי מול ממוצע חודשי'
-  },
-  xAxis: {
-    categories: months,
-    title: { text: 'חודש' }
-  },
-  yAxis: {
-    title: { text: 'ניקוד' }
-  },
-  tooltip: {
-    shared: true
-  },
-  series: [
-    {
-      type: 'column',
-      name: 'ניקוד אישי',
-      data: personal
+  body: JSON.stringify(REQUEST_BODY)
+})
+.then(res => res.json())
+.then(res => {
+  const rows =
+    res?.data?.[0]?.field_groups?.[0]?.fields_data || [];
+
+  /* =========================
+     5. מיפוי + סינון שנה אחרונה
+     ========================= */
+  const data = rows
+    .map(row => {
+      const getVal = fld =>
+        row.find(f => f.field_data_name === fld)?.value ?? null;
+
+      const dateVal = getVal("fld_3020");
+      if (!dateVal) return null;
+
+      const d = new Date(dateVal);
+      if (isNaN(d)) return null;
+      if (d < startDate || d > now) return null;
+
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+      return {
+        month: monthKey,
+        personal: Number(getVal("fld_3019")),
+        avg: Number(getVal("fld_3018"))
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.month.localeCompare(b.month));
+
+  if (!data.length) {
+    document.getElementById("container").innerHTML =
+      "<span style='color:red'>אין נתונים לשנה האחרונה</span>";
+    return;
+  }
+
+  /* =========================
+     6. הכנה לגרף
+     ========================= */
+  const months   = data.map(d => d.month);
+  const personal = data.map(d => d.personal);
+  const avg      = data.map(d => d.avg);
+
+  /* =========================
+     7. ציור הגרף
+     ========================= */
+  Highcharts.chart('container', {
+    title: {
+      text: 'ניקוד אישי מול ממוצע חודשי'
     },
-    {
-      type: 'line',
-      name: 'ממוצע חודשי',
-      data: avg,
-      marker: { enabled: true }
-    }
-  ],
-  credits: { enabled: false }
+    xAxis: {
+      categories: months,
+      title: { text: 'חודש' }
+    },
+    yAxis: {
+      title: { text: 'ניקוד' }
+    },
+    tooltip: {
+      shared: true
+    },
+    series: [
+      {
+        type: 'column',
+        name: 'ניקוד אישי',
+        data: personal
+      },
+      {
+        type: 'line',
+        name: 'ממוצע חודשי',
+        data: avg,
+        marker: { enabled: true }
+      }
+    ],
+    credits: { enabled: false }
+  });
+})
+.catch(err => {
+  console.error(err);
+  document.getElementById("container").innerHTML =
+    "<span style='color:red'>שגיאה בטעינת הנתונים</span>";
 });
 </script>
 
